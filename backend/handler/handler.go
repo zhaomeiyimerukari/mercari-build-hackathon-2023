@@ -544,6 +544,9 @@ func (h *Handler) AddBalance(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err)
 	}
 
+	if req.Balance < 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "User add minus balance")
+	}
 	userID, err := getUserID(c)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, err)
