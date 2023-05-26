@@ -80,7 +80,6 @@ type searchItemsResponse struct {
 }
 
 type sellRequest struct {
-	UserID int64 `json:"user_id"`
 	ItemID int32 `json:"item_id"`
 }
 
@@ -252,7 +251,7 @@ func (h *Handler) UpdateItem(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err)
 	}
 	ok := in(item, itemList)
-	if ok == false {
+	if !ok {
 		return c.JSON(http.StatusUnauthorized, "You can not update this item.")
 	}
 
@@ -356,6 +355,7 @@ func (h *Handler) AddItem(c echo.Context) error {
 	return c.JSON(http.StatusOK, addItemResponse{ID: int64(item.ID)})
 }
 
+// Does sellRequest include user_id ?
 func (h *Handler) Sell(c echo.Context) error {
 	ctx := c.Request().Context()
 	req := new(sellRequest)
@@ -379,18 +379,18 @@ func (h *Handler) Sell(c echo.Context) error {
 	// TODO: only update when status is initial
 	// http.StatusPreconditionFailed(412)
 
-	// userID, err := getUserID(c)
-	// if err != nil {
-	// 	return echo.NewHTTPError(http.StatusUnauthorized, err)
-	// }
-	// if userID != item.UserID {
-	// 	return c.JSON(http.StatusPreconditionFailed, "This item does not belong to this user.")
-	// }
-	if req.UserID != item.UserID {
+	userID, err := getUserID(c)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, err)
+	}
+	if userID != item.UserID {
 		return c.JSON(http.StatusPreconditionFailed, "This item does not belong to this user.")
 	}
+	// if req.UserID != item.UserID {
+	// 	return c.JSON(http.StatusPreconditionFailed, "This item does not belong to this user.")
+	// }
 	if item.Status != 1 {
-		return c.JSON(http.StatusPreconditionFailed, "Status is not initial.")
+		return c.JSON(http.StatusPreconditionFailed, "The item is already on sale or sold out.")
 	}
 	if err := h.ItemRepo.UpdateItemStatus(ctx, item.ID, domain.ItemStatusOnSale); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err)
