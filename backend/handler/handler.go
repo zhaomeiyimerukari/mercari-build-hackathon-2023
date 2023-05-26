@@ -220,6 +220,7 @@ func (h *Handler) Login(c echo.Context) error {
 	})
 }
 
+// todo:
 // when the item does not belong with this user ???
 func (h *Handler) UpdateItem(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -227,11 +228,6 @@ func (h *Handler) UpdateItem(c echo.Context) error {
 	req := new(updateItemRequest)
 	if err := c.Bind(req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err)
-	}
-
-	userID, err := getUserID(c)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusUnauthorized, err)
 	}
 
 	itemID, err := strconv.Atoi(c.Param("itemID"))
@@ -245,6 +241,19 @@ func (h *Handler) UpdateItem(c echo.Context) error {
 	}
 	if reflect.DeepEqual(item, domain.Item{}) {
 		return c.JSON(http.StatusPreconditionFailed, "Item not found")
+	}
+
+	userID, err := getUserID(c)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, err)
+	}
+	itemList, err := h.ItemRepo.GetItemsByUserID(ctx, userID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err)
+	}
+	ok := in(item, itemList)
+	if ok == false {
+		return c.JSON(http.StatusUnauthorized, "You can not update this item.")
 	}
 
 	file, err := c.FormFile("image")
@@ -378,11 +387,9 @@ func (h *Handler) Sell(c echo.Context) error {
 	// 	return c.JSON(http.StatusPreconditionFailed, "This item does not belong to this user.")
 	// }
 	if req.UserID != item.UserID {
-		fmt.Sprintln(req.UserID)
-		fmt.Sprintln(item.UserID)
 		return c.JSON(http.StatusPreconditionFailed, "This item does not belong to this user.")
 	}
-	if item.Status != 0 {
+	if item.Status != 1 {
 		return c.JSON(http.StatusPreconditionFailed, "Status is not initial.")
 	}
 	if err := h.ItemRepo.UpdateItemStatus(ctx, item.ID, domain.ItemStatusOnSale); err != nil {
@@ -641,13 +648,8 @@ func (h *Handler) Purchase(c echo.Context) error {
 	if reflect.DeepEqual(item, domain.Item{}) {
 		return c.JSON(http.StatusPreconditionFailed, "Item not found")
 	}
-	if item.Status != 1 {
+	if item.Status != 2 {
 		return c.JSON(http.StatusPreconditionFailed, "Item is not on sale!")
-	}
-
-	// オーバーフローしていると。ここのint32(itemID)がバグって正常に処理ができないはず
-	if err := h.ItemRepo.UpdateItemStatus(ctx, int32(itemID), domain.ItemStatusSoldOut); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err)
 	}
 
 	user, err := h.UserRepo.GetUser(ctx, userID)
@@ -671,7 +673,16 @@ func (h *Handler) Purchase(c echo.Context) error {
 	if balance < 0 {
 		return c.JSON(http.StatusPreconditionFailed, "Your balance is insufficient.")
 	}
+
+	// オーバーフローしていると。ここのint32(itemID)がバグって正常に処理ができないはず
+	if err := h.ItemRepo.UpdateItemStatus(ctx, int32(itemID), domain.ItemStatusSoldOut); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err)
+	}
+
 	if err := h.UserRepo.UpdateBalance(ctx, userID, balance); err != nil {
+		if e := h.ItemRepo.UpdateItemStatus(ctx, int32(itemID), domain.ItemStatusOnSale); e != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, err)
+		}
 		return echo.NewHTTPError(http.StatusInternalServerError, err)
 	}
 
@@ -682,13 +693,22 @@ func (h *Handler) Purchase(c echo.Context) error {
 	// TODO: not found handling
 	// http.StatusPreconditionFailed(412)
 	if err != nil {
+		if e := h.ItemRepo.UpdateItemStatus(ctx, int32(itemID), domain.ItemStatusOnSale); e != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, err)
+		}
 		return echo.NewHTTPError(http.StatusInternalServerError, err)
 	}
 	if reflect.DeepEqual(seller, domain.User{}) {
+		if e := h.ItemRepo.UpdateItemStatus(ctx, int32(itemID), domain.ItemStatusOnSale); e != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, err)
+		}
 		return c.JSON(http.StatusPreconditionFailed, "Seller not found")
 	}
 
 	if err := h.UserRepo.UpdateBalance(ctx, sellerID, seller.Balance+item.Price); err != nil {
+		if e := h.ItemRepo.UpdateItemStatus(ctx, int32(itemID), domain.ItemStatusOnSale); e != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, err)
+		}
 		return echo.NewHTTPError(http.StatusInternalServerError, err)
 	}
 
@@ -714,4 +734,13 @@ func getEnv(key string, defaultValue string) string {
 		return defaultValue
 	}
 	return value
+}
+
+func in(item domain.Item, itemList []domain.Item) bool {
+	for _, element := range itemList {
+		if item == element {
+			return true
+		}
+	}
+	return false
 }
