@@ -738,7 +738,7 @@ func getEnv(key string, defaultValue string) string {
 
 func in(item domain.Item, itemList []domain.Item) bool {
 	for _, element := range itemList {
-		if item == element {
+		if item.ID == element.ID {
 			return true
 		}
 	}
