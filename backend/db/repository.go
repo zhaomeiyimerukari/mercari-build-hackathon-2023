@@ -3,8 +3,11 @@ package db
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"net/http"
 
 	"github.com/Tanrungthip/mecari-build-hackathon-2023/backend/domain"
+	"github.com/labstack/echo/v4"
 )
 
 type UserRepository interface {
@@ -22,9 +25,19 @@ func NewUserRepository(db *sql.DB) UserRepository {
 }
 
 func (r *UserDBRepository) AddUser(ctx context.Context, user domain.User) (int64, error) {
-	if _, err := r.ExecContext(ctx, "INSERT INTO users (name, password) VALUES (?, ?)", user.Name, user.Password); err != nil {
+	tx, err := r.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
+	if err != nil {
+		fmt.Sprintf("failed to begin DB: %s\n", err)
 		return 0, err
 	}
+
+	if _, err := tx.ExecContext(ctx, "INSERT INTO users (name, password) VALUES (?, ?)", user.Name, user.Password); err != nil {
+		tx.Rollback()
+		return 0, echo.NewHTTPError(http.StatusConflict, err)
+	} else {
+		tx.Commit()
+	}
+
 	// TODO: if other insert query is executed at the same time, it might return wrong id
 	// http.StatusConflict(409) 既に同じIDがあった場合
 	row := r.QueryRowContext(ctx, "SELECT id FROM users WHERE rowid = LAST_INSERT_ROWID()")
@@ -41,8 +54,18 @@ func (r *UserDBRepository) GetUser(ctx context.Context, id int64) (domain.User, 
 }
 
 func (r *UserDBRepository) UpdateBalance(ctx context.Context, id int64, balance int64) error {
-	if _, err := r.ExecContext(ctx, "UPDATE users SET balance = ? WHERE id = ?", balance, id); err != nil {
+	tx, err := r.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
+	if err != nil {
+		fmt.Sprintf("failed to begin DB: %s\n", err)
+		// log.Fatal(err)
 		return err
+	}
+
+	if _, err := r.ExecContext(ctx, "UPDATE users SET balance = ? WHERE id = ?", balance, id); err != nil {
+		tx.Rollback()
+		return echo.NewHTTPError(http.StatusConflict, err)
+	} else {
+		tx.Commit()
 	}
 	return nil
 }
@@ -55,6 +78,8 @@ type ItemRepository interface {
 	GetItemsByUserID(ctx context.Context, userID int64) ([]domain.Item, error)
 	GetCategory(ctx context.Context, id int64) (domain.Category, error)
 	GetCategories(ctx context.Context) ([]domain.Category, error)
+	SearchItem(ctx context.Context, name string) ([]domain.Item, error)
+	UpdateItem(ctx context.Context, item domain.Item) (domain.Item, error)
 	UpdateItemStatus(ctx context.Context, id int32, status domain.ItemStatus) error
 }
 
@@ -67,8 +92,41 @@ func NewItemRepository(db *sql.DB) ItemRepository {
 }
 
 func (r *ItemDBRepository) AddItem(ctx context.Context, item domain.Item) (domain.Item, error) {
-	if _, err := r.ExecContext(ctx, "INSERT INTO items (name, price, description, category_id, seller_id, image, status) VALUES (?, ?, ?, ?, ?, ?, ?)", item.Name, item.Price, item.Description, item.CategoryID, item.UserID, item.Image, item.Status); err != nil {
+	tx, err := r.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
+	if err != nil {
+		fmt.Sprintf("failed to begin DB: %s\n", err)
+		// log.Fatal(err)
 		return domain.Item{}, err
+	}
+
+	if _, err := tx.ExecContext(ctx, "INSERT INTO items (name, price, description, category_id, seller_id, image, status) VALUES (?, ?, ?, ?, ?, ?, ?)", item.Name, item.Price, item.Description, item.CategoryID, item.UserID, item.Image, item.Status); err != nil {
+		tx.Rollback()
+		return domain.Item{}, echo.NewHTTPError(http.StatusConflict, err)
+	} else {
+		tx.Commit()
+	}
+
+	// TODO: if other insert query is executed at the same time, it might return wrong id
+	// http.StatusConflict(409) 既に同じIDがあった場合
+	row := r.QueryRowContext(ctx, "SELECT * FROM items WHERE rowid = LAST_INSERT_ROWID()")
+
+	var res domain.Item
+	return res, row.Scan(&res.ID, &res.Name, &res.Price, &res.Description, &res.CategoryID, &res.UserID, &res.Image, &res.Status, &res.CreatedAt, &res.UpdatedAt)
+}
+
+func (r *ItemDBRepository) UpdateItem(ctx context.Context, item domain.Item) (domain.Item, error) {
+	tx, err := r.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
+	if err != nil {
+		fmt.Sprintf("failed to begin DB: %s\n", err)
+		// log.Fatal(err)
+		return domain.Item{}, err
+	}
+
+	if _, err := r.ExecContext(ctx, "UPDATE items price=?, description=?, category_id=? WHERE name=?", item.Price, item.Description, item.CategoryID, item.Name); err != nil {
+		tx.Rollback()
+		return domain.Item{}, echo.NewHTTPError(http.StatusConflict, err)
+	} else {
+		tx.Commit()
 	}
 	// TODO: if other insert query is executed at the same time, it might return wrong id
 	// http.StatusConflict(409) 既に同じIDがあった場合
@@ -83,6 +141,27 @@ func (r *ItemDBRepository) GetItem(ctx context.Context, id int32) (domain.Item, 
 
 	var item domain.Item
 	return item, row.Scan(&item.ID, &item.Name, &item.Price, &item.Description, &item.CategoryID, &item.UserID, &item.Image, &item.Status, &item.CreatedAt, &item.UpdatedAt)
+}
+
+func (r *ItemDBRepository) SearchItem(ctx context.Context, name string) ([]domain.Item, error) {
+	name = "%" + name + "%"
+	rows, err := r.QueryContext(ctx, "SELECT * FROM items WHERE name LIKE ?", name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var itemlist []domain.Item
+	for rows.Next() {
+		var item domain.Item
+		if err := rows.Scan(&item.ID, &item.Name, &item.Price, &item.Description, &item.CategoryID, &item.UserID, &item.Image, &item.Status, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			return nil, err
+		}
+		itemlist = append(itemlist, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return itemlist, nil
 }
 
 func (r *ItemDBRepository) GetItemImage(ctx context.Context, id int32) ([]byte, error) {
