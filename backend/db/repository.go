@@ -79,7 +79,7 @@ type ItemRepository interface {
 	GetCategory(ctx context.Context, id int64) (domain.Category, error)
 	GetCategories(ctx context.Context) ([]domain.Category, error)
 	SearchItem(ctx context.Context, name string) ([]domain.Item, error)
-	UpdateItem(ctx context.Context, item domain.Item) (domain.Item, error)
+	UpdateItem(ctx context.Context, id int32, item domain.Item) error
 	UpdateItemStatus(ctx context.Context, id int32, status domain.ItemStatus) error
 }
 
@@ -114,26 +114,21 @@ func (r *ItemDBRepository) AddItem(ctx context.Context, item domain.Item) (domai
 	return res, row.Scan(&res.ID, &res.Name, &res.Price, &res.Description, &res.CategoryID, &res.UserID, &res.Image, &res.Status, &res.CreatedAt, &res.UpdatedAt)
 }
 
-func (r *ItemDBRepository) UpdateItem(ctx context.Context, item domain.Item) (domain.Item, error) {
+func (r *ItemDBRepository) UpdateItem(ctx context.Context, id int32, item domain.Item) error {
 	tx, err := r.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
 	if err != nil {
 		fmt.Sprintf("failed to begin DB: %s\n", err)
 		// log.Fatal(err)
-		return domain.Item{}, err
+		return err
 	}
 
-	if _, err := r.ExecContext(ctx, "UPDATE items price=?, description=?, category_id=? WHERE name=?", item.Price, item.Description, item.CategoryID, item.Name); err != nil {
+	if _, err := r.ExecContext(ctx, "UPDATE items SET name=?, price=?, description=?, category_id=? WHERE id=?", item.Name, item.Price, item.Description, item.CategoryID, id); err != nil {
 		tx.Rollback()
-		return domain.Item{}, echo.NewHTTPError(http.StatusConflict, err)
+		return echo.NewHTTPError(http.StatusConflict, err)
 	} else {
 		tx.Commit()
 	}
-	// TODO: if other insert query is executed at the same time, it might return wrong id
-	// http.StatusConflict(409) 既に同じIDがあった場合
-	row := r.QueryRowContext(ctx, "SELECT * FROM items WHERE rowid = LAST_INSERT_ROWID()")
-
-	var res domain.Item
-	return res, row.Scan(&res.ID, &res.Name, &res.Price, &res.Description, &res.CategoryID, &res.UserID, &res.Image, &res.Status, &res.CreatedAt, &res.UpdatedAt)
+	return nil
 }
 
 func (r *ItemDBRepository) GetItem(ctx context.Context, id int32) (domain.Item, error) {
