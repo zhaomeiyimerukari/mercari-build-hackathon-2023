@@ -1,5 +1,7 @@
 import React from "react";
 import { Item } from "../Item";
+// import { SearchBar } from "../SearchBar";
+
 interface Item {
   id: number;
   name: string;
