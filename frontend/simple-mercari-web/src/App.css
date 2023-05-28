@@ -142,6 +142,7 @@ body {
   justify-content: left;
 }
 
+/* added for searchbar */
 .input-group-text {
   display: flex;
   align-items: center;
@@ -155,4 +156,8 @@ body {
   background-color: #dc3545;
   border: 1px solid #dc3545;
   border-radius: var(--bs-border-radius);
+}
+
+.form-control {
+  border-color: white;
 }
