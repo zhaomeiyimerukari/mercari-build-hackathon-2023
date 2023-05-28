@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Item } from "../Item";
-import { RiSearchLine } from 'react-icons/ri';
+import { GoSearch } from 'react-icons/go';
+import axios from 'axios';
 
 
 interface Item {
@@ -18,6 +19,11 @@ export const ItemList: React.FC<Prop> = (props) => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const searchQuery = encodeURIComponent(e.target.value);
+    const newUrl = searchQuery ? `search?name=${searchQuery}` : "/";
+
+    // Updating the URL
+    window.history.pushState(null, "", newUrl);
     setSearchTerm(e.target.value);
   };
 
@@ -37,7 +43,7 @@ export const ItemList: React.FC<Prop> = (props) => {
             onChange={handleSearch}
           />
           <span className="input-group-text">
-            <RiSearchLine />
+            <GoSearch />
           </span>
         </div>
       </form>
