@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Item } from "../Item";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSearch } from "@fortawesome/free-solid-svg-icons";
+import { RiSearchLine } from 'react-icons/ri';
+
 
 interface Item {
   id: number;
@@ -37,7 +37,7 @@ export const ItemList: React.FC<Prop> = (props) => {
             onChange={handleSearch}
           />
           <span className="input-group-text">
-            <FontAwesomeIcon icon={faSearch} />
+            <RiSearchLine />
           </span>
         </div>
       </form>
