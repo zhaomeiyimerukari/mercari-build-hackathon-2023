@@ -6,7 +6,6 @@ import { MerComponent } from "../MerComponent";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { fetcher } from "../../helper";
-import { SearchBar } from "../SearchBar";
 import "react-toastify/dist/ReactToastify.css";
 
 interface Item {
@@ -59,9 +58,6 @@ export const Home = () => {
         <span>
           <p>Logined User ID: {cookies.userID}</p>
         </span>
-        <div>
-          <SearchBar/>
-        </div>
         <ItemList items={items} />
       </div>
     </MerComponent>
