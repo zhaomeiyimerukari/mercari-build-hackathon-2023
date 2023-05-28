@@ -1,9 +1,8 @@
 body {
-  background-color: #222427;
 }
 
 .MerComponent {
-  background-color: #222427;
+  background-color: #507d80;
   min-height: 8vh;
   display: flex;
   flex-direction: column;
@@ -11,9 +10,20 @@ body {
   justify-content: left;
   font-size: calc(10px + 1vmin);
   color: white;
+
 }
 
 #MerTextInput {
+  border: none;
+  border-radius: 15px;
+  background-color: #e8e8e8;
+  box-shadow: 6px 6px 12px #ffffff,
+  -6px -6px 12px #c5c5c5;
+  font-size: medium;
+  font-weight: bold;
+  max-width: 200px;
+  margin-bottom: 20px;
+  font-family: 'Josefin Sans', sans-serif;
   display: block;
   -webkit-box-flex: 1;
   flex: 1 1 0%;
@@ -32,7 +42,7 @@ body {
 
 #MerButton {
   /* color: var(--alias-color-text-inverse-default); */
-  background-color: #da3e50;
+  background-color: #c9c9c9;
   color: #222427;
   font: inherit;
   transition-timing-function: ease-in-out;
@@ -59,6 +69,7 @@ body {
   border-radius: 4px;
   cursor: pointer;
   transition-property: background-color, color, fill;
+  font-family: 'Varela Round', sans-serif;
 }
 
 #MerDisableButton {
@@ -104,6 +115,8 @@ body {
 }
 
 .Listing {
+  position: relative;
+  top: 50px;
   width: 100%;
 }
 
