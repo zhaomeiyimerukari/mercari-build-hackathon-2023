@@ -9,12 +9,12 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/Tanrungthip/mecari-build-hackathon-2023/backend/db"
+	"github.com/Tanrungthip/mecari-build-hackathon-2023/backend/handler"
 	"github.com/golang-jwt/jwt/v5"
 	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/mercari-build/mecari-build-hackathon-2023/backend/db"
-	"github.com/mercari-build/mecari-build-hackathon-2023/backend/handler"
 )
 
 const (
@@ -78,7 +78,7 @@ func run(ctx context.Context) int {
 	// Routes
 	e.POST("/initialize", h.Initialize)
 	e.GET("/log", h.AccessLog)
-
+	e.GET("/search", h.SearchItem)
 	e.GET("/items", h.GetOnSaleItems)
 	e.GET("/items/:itemID", h.GetItem)
 	e.GET("/items/:itemID/image", h.GetImage)
@@ -95,6 +95,7 @@ func run(ctx context.Context) int {
 	l.POST("/purchase/:itemID", h.Purchase)
 	l.GET("/balance", h.GetBalance)
 	l.POST("/balance", h.AddBalance)
+	l.PUT("/items/:itemID", h.UpdateItem)
 
 	// Start server
 	go func() {
